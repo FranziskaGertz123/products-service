@@ -5,6 +5,7 @@ import java.math.BigDecimal;
 
 public record IngredientDto(
         String name,
-        BigDecimal amount,
-        String unit
+        BigDecimal usage,
+        String unit,
+        BigDecimal price
 ) {}

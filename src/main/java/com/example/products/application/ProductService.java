@@ -1,5 +1,6 @@
 package com.example.products.application;
 
+import com.example.products.application.repository.ProductRepository;
 import com.example.products.messaging.events.ProductCreatedEvent;
 import com.example.products.messaging.events.ProductDeletedEvent;
 import com.example.products.messaging.ProductEventPublisher;
@@ -9,25 +10,24 @@ import com.example.products.application.dao.Product;
 import com.example.products.api.dto.IngredientDto;
 import com.example.products.api.dto.ProductDto;
 
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
-import com.example.products.application.repository.ProductRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
-
-import java.util.Optional;
 
 @Service
 public class ProductService implements GenericService<ProductDto, UUID> {
 
     private final ProductRepository productRepository;
-    private final ProductEventPublisher publisher;
+    private final ProductEventPublisher eventPublisher;
 
-    public ProductService(ProductRepository productRepository, ProductEventPublisher publisher) {
+    public ProductService(ProductRepository productRepository, ProductEventPublisher eventPublisher) {
         this.productRepository = productRepository;
-        this.publisher = publisher;
+        this.eventPublisher = eventPublisher;
     }
 
     @Override
@@ -48,22 +48,16 @@ public class ProductService implements GenericService<ProductDto, UUID> {
     public ProductDto create(ProductDto dto) {
         Product product = new Product();
         product.setName(dto.name());
-        product.setPrice(dto.price());
-
-        List<Ingredient> ingredients = dto.ingredients().stream()
-                .map(this::toIngredient)
-                .toList();
-        product.setIngredients(new ArrayList<>(ingredients));
-
+        product.setRecipeVersion(dto.recipeVersion() == null ? 1 : dto.recipeVersion());
+        product.setIngredients(toEntityIngredients(dto.ingredients()));
 
         Product saved = productRepository.save(product);
 
-        publisher.publishProductCreated(
+        eventPublisher.publishProductCreated(
                 new ProductCreatedEvent(saved.getId(), saved.getName(), dto.ingredients())
         );
 
         return toDto(saved);
-
     }
 
     @Override
@@ -71,17 +65,13 @@ public class ProductService implements GenericService<ProductDto, UUID> {
         return productRepository.findById(id)
                 .map(existing -> {
                     existing.setName(dto.name());
+                    existing.setIngredients(toEntityIngredients(dto.ingredients()));
 
-                    existing.getIngredients().clear();
-                    existing.getIngredients().addAll(
-                            dto.ingredients().stream()
-                                    .map(this::toIngredient)
-                                    .toList()
-                    );
+                    existing.setRecipeVersion(existing.getRecipeVersion() + 1);
 
                     Product saved = productRepository.save(existing);
 
-                    publisher.publishProductUpdated(
+                    eventPublisher.publishProductUpdated(
                             new ProductUpdatedEvent(saved.getId(), saved.getName(), dto.ingredients())
                     );
 
@@ -92,27 +82,6 @@ public class ProductService implements GenericService<ProductDto, UUID> {
     @Override
     public void delete(UUID id) {
         productRepository.deleteById(id);
-
-        publisher.publishProductDeleted(
-                new ProductDeletedEvent(id)
-        );
-
-    }
-
-    private Ingredient toIngredient(IngredientDto dto) {
-        Ingredient i = new Ingredient();
-        i.setName(dto.name());
-        i.setAmount(dto.amount());
-        i.setUnit(dto.unit());
-        return i;
-    }
-
-    private IngredientDto toDto(Ingredient i) {
-        return new IngredientDto(
-                i.getName(),
-                i.getAmount(),
-                i.getUnit()
-        );
     }
 
     private ProductDto toDto(Product product) {
@@ -120,10 +89,39 @@ public class ProductService implements GenericService<ProductDto, UUID> {
                 product.getId(),
                 product.getName(),
                 product.getPrice(),
-                product.getIngredients().stream()
-                        .map(this::toDto)
-                        .toList()
+                product.getRecipeVersion(),
+                toDtoIngredients(product.getIngredients())
         );
     }
 
+    private List<Ingredient> toEntityIngredients(List<IngredientDto> dtos) {
+        if (dtos == null) return new ArrayList<>();
+
+        List<Ingredient> result = new ArrayList<>();
+        for (IngredientDto dto : dtos) {
+            if (dto == null) continue;
+
+            Ingredient i = new Ingredient();
+            i.setName(dto.name());
+            i.setUsage(dto.usage() == null ?  : dto.usage());
+            i.setUnit(dto.unit() == null ? null : dto.unit());
+            i.setPrice(dto.price() == null ? BigDecimal.ZERO : dto.price());
+
+            result.add(i);
+        }
+        return result;
+    }
+
+    private List<IngredientDto> toDtoIngredients(List<Ingredient> entities) {
+        if (entities == null) return List.of();
+
+        return entities.stream()
+                .map(e -> new IngredientDto(
+                        e.getName(),
+                        e.getUsage(),
+                        e.getUnit() == null ? null : e.getUnit().name(),
+                        e.getPrice()
+                ))
+                .toList();
+    }
 }

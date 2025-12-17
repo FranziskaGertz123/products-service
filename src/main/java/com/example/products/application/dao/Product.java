@@ -19,6 +19,7 @@ public class Product {
 
     private String name;
     private BigDecimal price;
+    private int recipeVersion = 1;
 
     @ElementCollection
     @CollectionTable(

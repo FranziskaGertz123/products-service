@@ -9,8 +9,8 @@ import java.math.BigDecimal;
 @Embeddable
 public class Ingredient {
     private String name;
-    private BigDecimal amount;
+    private BigDecimal usage;
     private String unit;
-
+    private BigDecimal price;
 }
 

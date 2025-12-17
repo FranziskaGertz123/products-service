@@ -8,5 +8,6 @@ public record ProductDto(
         UUID id,
         String name,
         BigDecimal price,
+        int recipeVersion,
         List<IngredientDto> ingredients
 ) {}
