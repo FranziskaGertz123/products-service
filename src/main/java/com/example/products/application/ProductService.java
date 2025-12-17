@@ -8,6 +8,9 @@ import com.example.products.application.dao.Ingredient;
 import com.example.products.application.dao.Product;
 import com.example.products.api.dto.IngredientDto;
 import com.example.products.api.dto.ProductDto;
+
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import com.example.products.application.repository.ProductRepository;
 import org.springframework.data.domain.Page;
@@ -45,6 +48,13 @@ public class ProductService implements GenericService<ProductDto, UUID> {
     public ProductDto create(ProductDto dto) {
         Product product = new Product();
         product.setName(dto.name());
+        product.setPrice(dto.price());
+
+        List<Ingredient> ingredients = dto.ingredients().stream()
+                .map(this::toIngredient)
+                .toList();
+        product.setIngredients(new ArrayList<>(ingredients));
+
 
         Product saved = productRepository.save(product);
 
@@ -61,6 +71,14 @@ public class ProductService implements GenericService<ProductDto, UUID> {
         return productRepository.findById(id)
                 .map(existing -> {
                     existing.setName(dto.name());
+
+                    existing.getIngredients().clear();
+                    existing.getIngredients().addAll(
+                            dto.ingredients().stream()
+                                    .map(this::toIngredient)
+                                    .toList()
+                    );
+
                     Product saved = productRepository.save(existing);
 
                     publisher.publishProductUpdated(
@@ -68,7 +86,6 @@ public class ProductService implements GenericService<ProductDto, UUID> {
                     );
 
                     return toDto(saved);
-
                 });
     }
 
@@ -82,6 +99,13 @@ public class ProductService implements GenericService<ProductDto, UUID> {
 
     }
 
+    private Ingredient toIngredient(IngredientDto dto) {
+        Ingredient i = new Ingredient();
+        i.setName(dto.name());
+        i.setAmount(dto.amount());
+        i.setUnit(dto.unit());
+        return i;
+    }
 
     private IngredientDto toDto(Ingredient i) {
         return new IngredientDto(

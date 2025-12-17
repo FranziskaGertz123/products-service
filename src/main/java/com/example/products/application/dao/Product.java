@@ -1,9 +1,6 @@
 package com.example.products.application.dao;
 
-import jakarta.persistence.ElementCollection;
-import jakarta.persistence. Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence. Id;
+import jakarta.persistence.*;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -13,12 +10,20 @@ import lombok.Data;
 
 @Data
 @Entity
+@Table(name = "products")
 public class Product {
+
     @Id
-    @GeneratedValue private UUID id;
+    @GeneratedValue
+    private UUID id;
+
     private String name;
     private BigDecimal price;
 
     @ElementCollection
+    @CollectionTable(
+            name = "product_ingredients",
+            joinColumns = @JoinColumn(name = "product_id")
+    )
     private List<Ingredient> ingredients = new ArrayList<>();
 }
