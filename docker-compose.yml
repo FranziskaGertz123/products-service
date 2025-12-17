@@ -1,0 +1,61 @@
+services:
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports:
+      - "127.0.0.1:5672:5672"
+      - "127.0.0.1:15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  products-db:
+    image: postgres:16
+    container_name: products-db
+    environment:
+      POSTGRES_DB: products
+      POSTGRES_USER: products
+      POSTGRES_PASSWORD: products
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - products_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U products -d products"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  products:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: products
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      products-db:
+        condition: service_healthy
+    ports:
+      - "127.0.0.1:8082:8082"
+    environment:
+      SPRING_PROFILES_ACTIVE: local
+
+      # Postgres (im Docker-Netz: Host = Service-Name)
+      SPRING_DATASOURCE_URL: jdbc:postgresql://products-db:5432/products
+      SPRING_DATASOURCE_USERNAME: products
+      SPRING_DATASOURCE_PASSWORD: products
+
+      # RabbitMQ (im Docker-Netz: Host = Service-Name)
+      SPRING_RABBITMQ_HOST: rabbitmq
+      SPRING_RABBITMQ_PORT: 5672
+      SPRING_RABBITMQ_USERNAME: guest
+      SPRING_RABBITMQ_PASSWORD: guest
+
+volumes:
+  products_pgdata:
