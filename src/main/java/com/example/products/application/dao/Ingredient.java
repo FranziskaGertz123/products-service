@@ -10,7 +10,7 @@ import java.math.BigDecimal;
 public class Ingredient {
     private String name;
     private BigDecimal usage;
-    private String unit;
+    private Unit unit;
     private BigDecimal price;
 }
 

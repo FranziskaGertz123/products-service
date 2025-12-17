@@ -11,6 +11,7 @@ import com.example.products.api.dto.IngredientDto;
 import com.example.products.api.dto.ProductDto;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -48,13 +49,24 @@ public class ProductService implements GenericService<ProductDto, UUID> {
     public ProductDto create(ProductDto dto) {
         Product product = new Product();
         product.setName(dto.name());
-        product.setRecipeVersion(dto.recipeVersion() == null ? 1 : dto.recipeVersion());
+        product.setRecipeVersion(1);
+
         product.setIngredients(toEntityIngredients(dto.ingredients()));
 
         Product saved = productRepository.save(product);
 
+        UUID eventId = UUID.randomUUID();
+        Instant occurredAt = Instant.now();
+
         eventPublisher.publishProductCreated(
-                new ProductCreatedEvent(saved.getId(), saved.getName(), dto.ingredients())
+                new ProductCreatedEvent(
+                        eventId,
+                        occurredAt,
+                        saved.getId(),
+                        saved.getName(),
+                        saved.getRecipeVersion(),
+                        dto.ingredients()
+                )
         );
 
         return toDto(saved);
@@ -65,14 +77,26 @@ public class ProductService implements GenericService<ProductDto, UUID> {
         return productRepository.findById(id)
                 .map(existing -> {
                     existing.setName(dto.name());
-                    existing.setIngredients(toEntityIngredients(dto.ingredients()));
+
+                    existing.getIngredients().clear();
+                    existing.getIngredients().addAll(toEntityIngredients(dto.ingredients()));
 
                     existing.setRecipeVersion(existing.getRecipeVersion() + 1);
 
                     Product saved = productRepository.save(existing);
 
+                    UUID eventId = UUID.randomUUID();
+                    Instant occurredAt = Instant.now();
+
                     eventPublisher.publishProductUpdated(
-                            new ProductUpdatedEvent(saved.getId(), saved.getName(), dto.ingredients())
+                            new ProductUpdatedEvent(
+                                    eventId,
+                                    occurredAt,
+                                    saved.getId(),
+                                    saved.getName(),
+                                    saved.getRecipeVersion(),
+                                    dto.ingredients()
+                            )
                     );
 
                     return toDto(saved);
@@ -82,6 +106,16 @@ public class ProductService implements GenericService<ProductDto, UUID> {
     @Override
     public void delete(UUID id) {
         productRepository.deleteById(id);
+        UUID eventId = UUID.randomUUID();
+        Instant occurredAt = Instant.now();
+
+        eventPublisher.publishProductDeleted(
+                new ProductDeletedEvent(
+                        eventId,
+                        occurredAt,
+                        id
+                )
+        );
     }
 
     private ProductDto toDto(Product product) {
@@ -103,8 +137,11 @@ public class ProductService implements GenericService<ProductDto, UUID> {
 
             Ingredient i = new Ingredient();
             i.setName(dto.name());
-            i.setUsage(dto.usage() == null ?  : dto.usage());
+
+            i.setUsage(dto.usage() == null ? BigDecimal.ZERO : dto.usage());
+
             i.setUnit(dto.unit() == null ? null : dto.unit());
+
             i.setPrice(dto.price() == null ? BigDecimal.ZERO : dto.price());
 
             result.add(i);
@@ -119,7 +156,7 @@ public class ProductService implements GenericService<ProductDto, UUID> {
                 .map(e -> new IngredientDto(
                         e.getName(),
                         e.getUsage(),
-                        e.getUnit() == null ? null : e.getUnit().name(),
+                        e.getUnit() == null ? null : e.getUnit(),
                         e.getPrice()
                 ))
                 .toList();

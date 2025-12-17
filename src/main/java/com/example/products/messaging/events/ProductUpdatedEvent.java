@@ -11,6 +11,7 @@ public record ProductUpdatedEvent(
         Instant occurredAt,
         UUID productId,
         String productName,
+        int productVersion,
         List<IngredientDto> ingredients
 ) {
 }
