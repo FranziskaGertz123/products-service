@@ -49,6 +49,7 @@ public class ProductService implements GenericService<ProductDto, UUID> {
     public ProductDto create(ProductDto dto) {
         Product product = new Product();
         product.setName(dto.name());
+        product.setPrice(dto.price());
         product.setRecipeVersion(1);
 
         product.setIngredients(toEntityIngredients(dto.ingredients()));
@@ -77,6 +78,7 @@ public class ProductService implements GenericService<ProductDto, UUID> {
         return productRepository.findById(id)
                 .map(existing -> {
                     existing.setName(dto.name());
+                    existing.setPrice(dto.price());
 
                     existing.getIngredients().clear();
                     existing.getIngredients().addAll(toEntityIngredients(dto.ingredients()));
@@ -160,5 +162,19 @@ public class ProductService implements GenericService<ProductDto, UUID> {
                         e.getPrice()
                 ))
                 .toList();
+    }
+
+    private static final BigDecimal PRICE_FACTOR = BigDecimal.valueOf(3);
+
+    private BigDecimal calculateProductPrice(List<Ingredient> ingredients) {
+        if (ingredients == null || ingredients.isEmpty()) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal sum = ingredients.stream()
+                .map(Ingredient::getPrice)
+                .filter(p -> p != null)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        return sum.multiply(PRICE_FACTOR);
     }
 }
